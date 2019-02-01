@@ -1,11 +1,16 @@
 from setuptools import setup
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
+from csmlog import __version__
 
 setup(
     name='csmlog',
     author='csm10495',
     author_email='csm10495@gmail.com',
     url='http://github.com/csm10495/csmlog',
-    version='0.2a',
+    version=__version__,
     packages=['csmlog'],
     license='MIT License',
     python_requires='>=2.7',

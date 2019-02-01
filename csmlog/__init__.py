@@ -6,6 +6,9 @@ MIT License (2019) - Charles Machalow
 import logging
 import logging.handlers
 import os
+import shutil
+
+__version__ = '0.3a'
 
 class CSMLogger(object):
     '''
@@ -13,13 +16,27 @@ class CSMLogger(object):
     '''
     theLogger = None # class-obj for the used logger
 
-    def __init__(self, appName):
+    def __init__(self, appName, clearLogs=False):
         self.appName = appName
+        if clearLogs:
+            self.clearLogs()
+
         self.parentLogger = self.__getParentLogger()
+        self._loggers = [self.parentLogger] # keep track of all loggers
+
+    def close(self):
+        for logger in self._loggers:
+            for handler in logger.handlers[:]:
+                handler.close()
+                logger.removeHandler(handler)
+
+        self._loggers = []
 
     def getLogger(self, name):
         loggerName = '%s.%s' % (self.appName, name) # make this a sublogger of the whole app
-        return self.__getLoggerWithName(loggerName)
+        logger = self.__getLoggerWithName(loggerName)
+        self._loggers.append(logger)
+        return logger
 
     def __getParentLogger(self):
         return self.__getLoggerWithName(self.appName)
@@ -41,22 +58,33 @@ class CSMLogger(object):
         return logger
 
     def getDefaultSaveDirectory(self):
+        return self.getDefaultSaveDirectoryWithName(self.appName)
+
+    @classmethod
+    def getDefaultSaveDirectoryWithName(cls, appName):
         if os.name == 'nt':
-            logFolder = os.path.join(os.path.expandvars("%APPDATA%"), self.appName)
+            logFolder = os.path.join(os.path.expandvars("%APPDATA%"), appName)
         else:
-            logFolder = os.path.join('/var/log/', self.appName)
+            logFolder = os.path.join('/var/log/', appName)
 
         if not os.path.isdir(logFolder):
             os.makedirs(logFolder)
 
         return logFolder
 
+    def clearLogs(self):
+        shutil.rmtree(self.getDefaultSaveDirectory())
+
+        # recreate empty folder
+        self.getDefaultSaveDirectory()
+
     @classmethod
-    def setup(cls, appName, *args, **kwargs):
+    def setup(cls, appName, clearLogs=False):
         ''' must be called to setup the logger. Passes args to CSMLogger's constructor '''
-        if cls.theLogger:
+        if getattr(cls, 'theLogger', None):
             raise RuntimeError("CSMLogger was already setup. It can only be setup once!")
-        CSMLogger.theLogger = CSMLogger(appName, *args, **kwargs)
+
+        CSMLogger.theLogger = CSMLogger(appName, clearLogs)
         CSMLogger.theLogger.parentLogger.debug("==== %s is starting ====" % appName)
 
 
@@ -68,5 +96,15 @@ def getLogger(*args, **kwargs):
         raise RuntimeError("CSMLogger.setup() must be called first!")
 
     return CSMLogger.theLogger.getLogger(*args, **kwargs)
+
+def close():
+    if not CSMLogger.theLogger:
+        raise RuntimeError("CSMLogger.setup() must be called first!")
+    retVal = CSMLogger.theLogger.close()
+    CSMLogger.theLogger = None
+    return retVal
+
+def getCSMLogger():
+    return CSMLogger.theLogger
 
 setup = CSMLogger.setup
