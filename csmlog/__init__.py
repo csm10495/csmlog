@@ -22,6 +22,7 @@ class CSMLogger(object):
             self.clearLogs()
 
         self.parentLogger = self.__getParentLogger()
+        self.consoleLoggingStream = None
         self._loggers = [self.parentLogger] # keep track of all loggers
 
     def close(self):
@@ -49,7 +50,7 @@ class CSMLogger(object):
 
         logFile = os.path.join(logFolder, loggerName + ".txt")
 
-        formatter = logging.Formatter('%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s')
+        formatter = self.getFormatter()
 
         rfh = logging.handlers.RotatingFileHandler(logFile, maxBytes=1024*1024*8, backupCount=10)
         rfh.setFormatter(formatter)
@@ -57,8 +58,26 @@ class CSMLogger(object):
 
         return logger
 
+    def getFormatter(self):
+        return logging.Formatter('%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s')
+
     def getDefaultSaveDirectory(self):
         return self.getDefaultSaveDirectoryWithName(self.appName)
+
+    def enableConsoleLogging(self, level=1):
+        if not self.consoleLoggingStream:
+            self.consoleLoggingStream = logging.StreamHandler()
+            self.consoleLoggingStream.setFormatter(self.getFormatter())
+            self.parentLogger.addHandler(self.consoleLoggingStream)
+
+        self.consoleLoggingStream.setLevel(level)
+
+    def disableConsoleLogging(self):
+        if not self.consoleLoggingStream:
+            raise RuntimeError("Managed console logging is not active")
+
+        self.parentLogger.removeHandler(self.consoleLoggingStream)
+        self.consoleLoggingStream = None
 
     @classmethod
     def getDefaultSaveDirectoryWithName(cls, appName):
@@ -106,5 +125,17 @@ def close():
 
 def getCSMLogger():
     return CSMLogger.theLogger
+
+def enableConsoleLogging(*args, **kwargs):
+    if not CSMLogger.theLogger:
+        raise RuntimeError("CSMLogger.setup() must be called first!")
+
+    return CSMLogger.theLogger.enableConsoleLogging(*args, **kwargs)
+
+def disableConsoleLogging(*args, **kwargs):
+    if not CSMLogger.theLogger:
+        raise RuntimeError("CSMLogger.setup() must be called first!")
+
+    return CSMLogger.theLogger.disableConsoleLogging(*args, **kwargs)
 
 setup = CSMLogger.setup
