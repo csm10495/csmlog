@@ -41,7 +41,7 @@ def test_multi_setup_fails(csmlog):
     with pytest.raises(RuntimeError):
         CSMLogger.setup('round 2')
 
-def test_sending_to_stdout(csmlog):
+def test_sending_to_stderr(csmlog):
     sys.stderr = io.StringIO()
     logger = csmlog.getLogger("tmp")
 
@@ -53,7 +53,7 @@ def test_sending_to_stdout(csmlog):
 
     finally:
         output = sys.stderr.getvalue()
-        sys.stdout = sys.__stderr__
+        sys.stderr = sys.__stderr__
 
     assert "test" in output
     assert 'failure' not in output
