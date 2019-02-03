@@ -1,5 +1,9 @@
-import pytest
+import io
 import os
+import sys
+
+import pytest
+
 from conftest import APPNAME, CSMLogger
 
 def test_get_logger_and_clear_logs(csmlog):
@@ -36,3 +40,20 @@ def test_multi_setup_fails(csmlog):
     # can't setup again
     with pytest.raises(RuntimeError):
         CSMLogger.setup('round 2')
+
+def test_sending_to_stdout(csmlog):
+    sys.stderr = io.StringIO()
+    logger = csmlog.getLogger("tmp")
+
+    try:
+        csmlog.enableConsoleLogging()
+        logger.debug("test")
+        csmlog.disableConsoleLogging()
+        logger.debug("failure")
+
+    finally:
+        output = sys.stderr.getvalue()
+        sys.stdout = sys.__stderr__
+
+    assert "test" in output
+    assert 'failure' not in output
