@@ -77,6 +77,7 @@ def test_sending_to_alt_stream(csmlog):
 
 def test_2_enables_disables_first(csmlog):
     sys.stderr = io.StringIO()
+    sys.stdout = io.StringIO()
     logger = csmlog.getLogger("tmp")
 
     try:
@@ -89,8 +90,13 @@ def test_2_enables_disables_first(csmlog):
         logger.debug("failure")
 
     finally:
-        output = sys.stderr.getvalue()
-        sys.stderr = sys.__stdout__
+        stderrOut = sys.stderr.getvalue()
+        stdoutOut = sys.stdout.getvalue()
+        sys.stderr = sys.__stderr__
+        sys.stdout = sys.__stdout__
 
-    assert "test" not in output
-    assert 'failure' not in output
+    assert "test" not in stderrOut
+    assert 'failure' not in stderrOut
+
+    assert "test" in stdoutOut
+    assert 'failure' not in stdoutOut
