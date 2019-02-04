@@ -57,3 +57,40 @@ def test_sending_to_stderr(csmlog):
 
     assert "test" in output
     assert 'failure' not in output
+
+def test_sending_to_alt_stream(csmlog):
+    sys.stdout = io.StringIO()
+    logger = csmlog.getLogger("tmp")
+
+    try:
+        csmlog.enableConsoleLogging(stream=sys.stdout)
+        logger.debug("test")
+        csmlog.disableConsoleLogging()
+        logger.debug("failure")
+
+    finally:
+        output = sys.stdout.getvalue()
+        sys.stdout = sys.__stdout__
+
+    assert "test" in output
+    assert 'failure' not in output
+
+def test_2_enables_disables_first(csmlog):
+    sys.stderr = io.StringIO()
+    logger = csmlog.getLogger("tmp")
+
+    try:
+        csmlog.enableConsoleLogging(stream=sys.stderr)
+
+        # only sys.stdout is active
+        csmlog.enableConsoleLogging(stream=sys.stdout)
+        logger.debug("test")
+        csmlog.disableConsoleLogging()
+        logger.debug("failure")
+
+    finally:
+        output = sys.stderr.getvalue()
+        sys.stderr = sys.__stdout__
+
+    assert "test" not in output
+    assert 'failure' not in output

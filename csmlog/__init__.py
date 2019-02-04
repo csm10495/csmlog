@@ -7,6 +7,7 @@ import logging
 import logging.handlers
 import os
 import shutil
+import sys
 
 __version__ = '0.3a'
 
@@ -64,9 +65,18 @@ class CSMLogger(object):
     def getDefaultSaveDirectory(self):
         return self.getDefaultSaveDirectoryWithName(self.appName)
 
-    def enableConsoleLogging(self, level=1):
-        if not self.consoleLoggingStream:
-            self.consoleLoggingStream = logging.StreamHandler()
+    def enableConsoleLogging(self, level=1, stream=None):
+        if stream is None:
+            # evaluate sys.stderr later since pytest may change it
+            stream = sys.stderr
+
+        if self.consoleLoggingStream:
+            self.disableConsoleLogging()
+
+            # recursive
+            return self.enableConsoleLogging(level=level, stream=stream)
+        else:
+            self.consoleLoggingStream = logging.StreamHandler(stream)
             self.consoleLoggingStream.setFormatter(self.getFormatter())
             self.parentLogger.addHandler(self.consoleLoggingStream)
 
