@@ -9,7 +9,9 @@ import os
 import shutil
 import sys
 
-__version__ = '0.3a'
+__version__ = '0.4a'
+
+from udp_handler import UdpHandler
 
 class CSMLogger(object):
     '''
@@ -17,8 +19,10 @@ class CSMLogger(object):
     '''
     theLogger = None # class-obj for the used logger
 
-    def __init__(self, appName, clearLogs=False):
+    def __init__(self, appName, clearLogs=False, udpLogging=True):
         self.appName = appName
+        self.udpLogging = udpLogging
+
         if clearLogs:
             self.clearLogs()
 
@@ -41,7 +45,13 @@ class CSMLogger(object):
         return logger
 
     def __getParentLogger(self):
-        return self.__getLoggerWithName(self.appName)
+        logger = self.__getLoggerWithName(self.appName)
+        if self.udpLogging:
+            handler = UdpHandler()
+            handler.setFormatter(self.getFormatter())
+            logger.addHandler(handler)
+
+        return logger
 
     def __getLoggerWithName(self, loggerName):
         logger = logging.getLogger(loggerName)
@@ -108,12 +118,12 @@ class CSMLogger(object):
         self.getDefaultSaveDirectory()
 
     @classmethod
-    def setup(cls, appName, clearLogs=False):
+    def setup(cls, appName, clearLogs=False, udpLogging=True):
         ''' must be called to setup the logger. Passes args to CSMLogger's constructor '''
         if getattr(cls, 'theLogger', None):
             raise RuntimeError("CSMLogger was already setup. It can only be setup once!")
 
-        CSMLogger.theLogger = CSMLogger(appName, clearLogs)
+        CSMLogger.theLogger = CSMLogger(appName, clearLogs, udpLogging)
         CSMLogger.theLogger.parentLogger.debug("==== %s is starting ====" % appName)
 
 
