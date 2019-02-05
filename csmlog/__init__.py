@@ -11,7 +11,8 @@ import sys
 
 __version__ = '0.4a'
 
-from udp_handler import UdpHandler
+from csmlog.udp_handler import UdpHandler
+from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
 class CSMLogger(object):
     '''

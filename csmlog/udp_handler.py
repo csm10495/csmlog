@@ -20,5 +20,10 @@ class UdpHandler(logging.StreamHandler):
         return '<UdpHandler %s:%s>' % (self.ip, self.port)
 
     def emit(self, record):
-        msg = self.format(record) + "\n"
-        self.socket.sendto(msg.encode(), (self.ip, self.port))
+        msg = (self.format(record) + "\n").encode()
+        msgLen = len(msg)
+        offset = 0
+
+        # make sure we send all
+        while offset < msgLen:
+            offset += self.socket.sendto(msg[offset:], (self.ip, self.port))

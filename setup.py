@@ -26,9 +26,9 @@ setup(
     ],
     include_package_data = True,
     install_requires=['six'],
-    #entry_points={
-    #    'console_scripts': [
-    #        'csmlog' = ?' # todo... interactive?
-    #    ]
-    #},
+    entry_points={
+        'console_scripts': [
+            'csmlogudp = csmlog.udp_handler_receiver:main'
+        ]
+    },
 )

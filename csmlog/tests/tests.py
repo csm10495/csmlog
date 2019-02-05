@@ -1,10 +1,13 @@
 import io
 import os
 import sys
+import threading
+import time
 
 import pytest
 
-from conftest import APPNAME, CSMLogger
+from conftest import APPNAME, CSMLogger, UdpHandlerReceiver
+
 
 def test_get_logger_and_clear_logs(csmlog):
 
@@ -100,3 +103,24 @@ def test_2_enables_disables_first(csmlog):
 
     assert "test" in stdoutOut
     assert 'failure' not in stdoutOut
+
+def test_udp_logging(csmlog):
+    # create reciever
+    udpRecv = UdpHandlerReceiver()
+    thread = threading.Thread(target=udpRecv.recieveForever)
+    thread.start()
+
+    logger = csmlog.getLogger("tmp")
+    logger.debug("bleh" * 1000)
+
+    for i in range(5):
+        if udpRecv.getBuffer().count("bleh") == 1000:
+            break
+
+        # technically it may take a moment to appear in the buffer
+        time.sleep(.1)
+    else:
+        assert udpRecv.getBuffer().count("bleh") == 1000
+
+    udpRecv.requestStop()
+    thread.join()
