@@ -9,7 +9,6 @@ import pytest
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from conftest import APPNAME, CSMLogger, UdpHandlerReceiver
 
-
 def test_get_logger_and_clear_logs(csmlog):
 
     tmp = csmlog.getLogger('tmp')
@@ -125,3 +124,7 @@ def test_udp_logging(csmlog):
 
     udpRecv.requestStop()
     thread.join()
+
+def test_file_attribute(csmlog):
+    logger = csmlog.getLogger(__file__)
+    logger.debug('hi')

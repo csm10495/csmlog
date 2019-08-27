@@ -9,7 +9,7 @@ import os
 import shutil
 import sys
 
-__version__ = '0.4a'
+__version__ = '0.5a'
 
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
@@ -40,6 +40,7 @@ class CSMLogger(object):
         self._loggers = []
 
     def getLogger(self, name):
+        name = os.path.basename(name)
         loggerName = '%s.%s' % (self.appName, name) # make this a sublogger of the whole app
         logger = self.__getLoggerWithName(loggerName)
         self._loggers.append(logger)
