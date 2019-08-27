@@ -6,6 +6,7 @@ import time
 
 import pytest
 
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from conftest import APPNAME, CSMLogger, UdpHandlerReceiver
 
 
