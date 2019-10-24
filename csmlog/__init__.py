@@ -9,7 +9,7 @@ import os
 import shutil
 import sys
 
-__version__ = '0.7a'
+__version__ = '0.8a'
 
 from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
