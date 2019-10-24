@@ -9,8 +9,9 @@ import os
 import shutil
 import sys
 
-__version__ = '0.5a'
+__version__ = '0.6a'
 
+from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
@@ -44,6 +45,7 @@ class CSMLogger(object):
         loggerName = '%s.%s' % (self.appName, name) # make this a sublogger of the whole app
         logger = self.__getLoggerWithName(loggerName)
         self._loggers.append(logger)
+        logger.sysCall = LoggedSystemCall(logger)
         return logger
 
     def __getParentLogger(self):

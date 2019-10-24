@@ -1,5 +1,6 @@
 import io
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -7,7 +8,7 @@ import time
 import pytest
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from conftest import APPNAME, CSMLogger, UdpHandlerReceiver
+from conftest import APPNAME, CSMLogger, UdpHandlerReceiver, LoggedSystemCall
 
 def test_get_logger_and_clear_logs(csmlog):
 
@@ -128,3 +129,23 @@ def test_udp_logging(csmlog):
 def test_file_attribute(csmlog):
     logger = csmlog.getLogger(__file__)
     logger.debug('hi')
+
+def test_logged_system_call(csmlog):
+    tmp = csmlog.getLogger('tmp')
+
+    sysCall = LoggedSystemCall(tmp)
+    assert sysCall.call("echo hi", shell=True) == 0
+    assert 'hi' in sysCall.check_output('echo hi', shell=True)
+
+    assert sysCall.call("easdsadcho hi", shell=True) != 0
+
+    with pytest.raises(subprocess.CalledProcessError):
+        sysCall.check_output('easdsadcho hi', shell=True)
+
+    loggerFile = os.path.join(csmlog.getDefaultSaveDirectory(), APPNAME + '.' + 'tmp.txt')
+    assert os.path.isfile(loggerFile)
+    with open(loggerFile, 'r') as f:
+        txt = f.read()
+
+    assert 'hi' in txt
+    assert 'easdsadcho' in txt
