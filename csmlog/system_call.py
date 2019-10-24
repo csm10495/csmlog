@@ -18,7 +18,7 @@ class LoggedSystemCall(object):
         while True:
             output = process.stdout.readline().decode()
             if output:
-                savedOutput += output + '\n'
+                savedOutput += output
                 self.logger.debug("<CMD OUTPUT>: %s" % output)
             else:
                 break
