@@ -41,9 +41,8 @@ def test_get_logger_and_clear_logs(csmlog):
     assert not os.path.isfile(loggerFile)
 
 def test_multi_setup_fails(csmlog):
-    # can't setup again
-    with pytest.raises(RuntimeError):
-        CSMLogger.setup('round 2')
+    # can setup again, with a warning only
+    CSMLogger.setup('round 2')
 
 def test_sending_to_stderr(csmlog):
     sys.stderr = io.StringIO()

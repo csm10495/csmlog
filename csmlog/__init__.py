@@ -1,6 +1,6 @@
 '''
 This file is part of csmlog. Python logger setup... the way I like it.
-MIT License (2019) - Charles Machalow
+MIT License (2020) - Charles Machalow
 '''
 
 import logging
@@ -9,7 +9,7 @@ import os
 import shutil
 import sys
 
-__version__ = '0.8a'
+__version__ = '0.9a'
 
 from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
@@ -125,7 +125,8 @@ class CSMLogger(object):
     def setup(cls, appName, clearLogs=False, udpLogging=True):
         ''' must be called to setup the logger. Passes args to CSMLogger's constructor '''
         if getattr(cls, 'theLogger', None):
-            raise RuntimeError("CSMLogger was already setup. It can only be setup once!")
+            CSMLogger.theLogger.parentLogger.debug("CSMLogger was already setup. It can only be setup once! ... not setting up appName: %s" % appName)
+            return
 
         CSMLogger.theLogger = CSMLogger(appName, clearLogs, udpLogging)
         CSMLogger.theLogger.parentLogger.debug("==== %s is starting ====" % appName)
