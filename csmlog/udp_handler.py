@@ -7,6 +7,8 @@ import logging
 import logging.handlers
 import socket
 
+MAX_BYTES_PER_SEND = 1024
+
 class UdpHandler(logging.StreamHandler):
     ''' handler to send live logs as raw text to a UDP socket '''
     stream = None
@@ -26,4 +28,4 @@ class UdpHandler(logging.StreamHandler):
 
         # make sure we send all
         while offset < msgLen:
-            offset += self.socket.sendto(msg[offset:], (self.ip, self.port))
+            offset += self.socket.sendto(msg[offset:offset+MAX_BYTES_PER_SEND], (self.ip, self.port))
