@@ -8,12 +8,15 @@ import logging.handlers
 import os
 import shutil
 import sys
-
-__version__ = '0.9a'
+import uuid
+from pathlib import Path
 
 from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
+
+__version__ = '0.10'
+
 
 class CSMLogger(object):
     '''
@@ -108,7 +111,17 @@ class CSMLogger(object):
         if os.name == 'nt':
             logFolder = os.path.join(os.path.expandvars("%APPDATA%"), appName)
         else:
-            logFolder = os.path.join('/var/log/', appName)
+            tmpPath = Path(f'/var/log/{uuid.uuid4()}')
+            try:
+                tmpPath.touch()
+                tmpPath.unlink()
+                tmpPath = tmpPath.parent
+            except PermissionError:
+                # can't use /var/log... try using ~/log/
+                tmpPath = Path.home() / 'log'
+                tmpPath.mkdir(exist_ok=True)
+
+            logFolder = tmpPath / appName
 
         if not os.path.isdir(logFolder):
             os.makedirs(logFolder)

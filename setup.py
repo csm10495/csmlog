@@ -13,7 +13,7 @@ setup(
     version=__version__,
     packages=['csmlog'],
     license='MIT License',
-    python_requires='>=2.7',
+    python_requires='>=3.6',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     classifiers=[
@@ -21,7 +21,6 @@ setup(
         'Natural Language :: English',
         'Operating System :: Microsoft :: Windows',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
     ],
     include_package_data = True,
