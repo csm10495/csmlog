@@ -33,4 +33,4 @@ for file in os.listdir(DIST_FOLDER):
     if file.upper().endswith('.TAR.GZ'):
         break
 
-caller('\"%s\" -m twine upload \"dist\%s\" -r pypi' % (sys.executable, file))
+caller('\"%s\" -m twine upload \"dist/%s\" -r pypi' % (sys.executable, file))
