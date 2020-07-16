@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 
+import pathlib
 import pytest
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -40,9 +41,38 @@ def test_get_logger_and_clear_logs(csmlog):
 
     assert not os.path.isfile(loggerFile)
 
-def test_multi_setup_fails(csmlog):
-    # can setup again, with a warning only
-    CSMLogger.setup('round 2')
+def test_multi_setup_passes_and_moves(csmlog):
+    ''' the final call to setup() is the one that prevails. '''
+
+    first_save_directory_path = csmlog.getDefaultSaveDirectory()
+    logger = csmlog.getLogger('test1')
+    logger.debug("hello1")
+
+    assert 'hello1' in pathlib.Path(logger.logFile).read_text()
+    CSMLogger.setup('test2')
+
+    # SAME LOGGER AS ABOVE... SHOULD STILL POINT TO ORIGINAL SPOT
+    logger.debug('hello2')
+    assert 'hello1' in pathlib.Path(logger.logFile).read_text()
+    assert 'hello2' in pathlib.Path(logger.logFile).read_text()
+
+    # this is a brand new logger. It should ONLY go to the new location
+    logger2 = csmlog.getLogger('test2')
+    logger2.debug('hello3')
+    assert 'hello1' not in pathlib.Path(logger2.logFile).read_text()
+    assert 'hello2' not in pathlib.Path(logger2.logFile).read_text()
+    assert 'hello3' in pathlib.Path(logger2.logFile).read_text()
+
+    logger.debug('hello4')
+    assert 'hello1' in pathlib.Path(logger.logFile).read_text()
+    assert 'hello2' in pathlib.Path(logger.logFile).read_text()
+    assert 'hello3' not in pathlib.Path(logger.logFile).read_text()
+    assert 'hello4' in pathlib.Path(logger.logFile).read_text()
+
+    assert 'hello1' not in pathlib.Path(logger2.logFile).read_text()
+    assert 'hello2' not in pathlib.Path(logger2.logFile).read_text()
+    assert 'hello3' in pathlib.Path(logger2.logFile).read_text()
+    assert 'hello4' not in pathlib.Path(logger2.logFile).read_text()
 
 def test_sending_to_stderr(csmlog):
     sys.stderr = io.StringIO()
@@ -148,3 +178,9 @@ def test_logged_system_call(csmlog):
 
     assert 'hi' in txt
     assert 'easdsadcho' in txt
+
+def test_added_attrs_on_logger(csmlog):
+    ''' we add in the logFolder/logFile to the python logger. Make sure they are there '''
+    tmp = csmlog.getLogger('tmp2')
+    assert pathlib.Path(tmp.logFile).is_file()
+    assert pathlib.Path(tmp.logFolder).is_dir()

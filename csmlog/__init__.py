@@ -15,15 +15,13 @@ from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = '0.10'
+__version__ = '0.20.0'
 
 
 class CSMLogger(object):
     '''
     object to wrap logging logic
     '''
-    theLogger = None # class-obj for the used logger
-
     def __init__(self, appName, clearLogs=False, udpLogging=True):
         self.appName = appName
         self.udpLogging = udpLogging
@@ -73,6 +71,10 @@ class CSMLogger(object):
         rfh = logging.handlers.RotatingFileHandler(logFile, maxBytes=1024*1024*8, backupCount=10)
         rfh.setFormatter(formatter)
         logger.addHandler(rfh)
+
+        # add the log file path / folder for easy access elsewhere
+        logger.logFile = logFile
+        logger.logFolder = logFolder
 
         return logger
 
@@ -134,46 +136,69 @@ class CSMLogger(object):
         # recreate empty folder
         self.getDefaultSaveDirectory()
 
-    @classmethod
-    def setup(cls, appName, clearLogs=False, udpLogging=True):
+class _CSMLoggerManager:
+    ''' manages the active instance (and older instances) of CSMLogger '''
+
+    def __init__(self):
+        # loggers that are no longer default (setup() was called again, though may still be in use)
+        self._oldCsmLoggers = []
+
+        # The currently active logger
+        self._activeCsmLogger = None
+
+        # publish methods from this guy
+        for name in dir(self):
+            if name.startswith('_') or name.endswith('_'):
+                continue
+
+            globals()[name] = getattr(self, name)
+
+    def getLogger(self, *args, **kwargs):
+        if not self._activeCsmLogger:
+            raise RuntimeError("(csmlog) setup() must be called first!")
+
+        return self._activeCsmLogger.getLogger(*args, **kwargs)
+
+    def close(self):
+        ''' will close ALL known CSMLoggers, including active and old '''
+        if not self._activeCsmLogger:
+            raise RuntimeError("(csmlog) setup() must be called first!")
+
+        self._activeCsmLogger.close()
+        self._activeCsmLogger = None
+
+        for i in self._oldCsmLoggers:
+            i.close()
+
+        self._oldCsmLoggers.clear()
+
+    def getCSMLogger(self):
+        return self._activeCsmLogger
+
+    def enableConsoleLogging(self, *args, **kwargs):
+        if not self._activeCsmLogger:
+            raise RuntimeError("(csmlog) setup() must be called first!")
+
+        return self._activeCsmLogger.enableConsoleLogging(*args, **kwargs)
+
+    def disableConsoleLogging(self, *args, **kwargs):
+        if not self._activeCsmLogger:
+            raise RuntimeError("(csmlog) setup() must be called first!")
+
+        return self._activeCsmLogger.disableConsoleLogging(*args, **kwargs)
+
+    def setup(self, appName, clearLogs=False, udpLogging=True):
         ''' must be called to setup the logger. Passes args to CSMLogger's constructor '''
-        if getattr(cls, 'theLogger', None):
-            CSMLogger.theLogger.parentLogger.debug("CSMLogger was already setup. It can only be setup once! ... not setting up appName: %s" % appName)
-            return
 
-        CSMLogger.theLogger = CSMLogger(appName, clearLogs, udpLogging)
-        CSMLogger.theLogger.parentLogger.debug("==== %s is starting ====" % appName)
+        if self._activeCsmLogger is not None:
+            self._activeCsmLogger.parentLogger.debug("CSMLogger was already setup. Swapping to appName: %s." % appName)
+            self._oldCsmLoggers.append(self._activeCsmLogger)
 
+        self._activeCsmLogger = CSMLogger(appName, clearLogs, udpLogging)
+        self._activeCsmLogger.parentLogger.debug("==== %s is starting ====" % appName)
 
-# the following helper logic only works if the entire application is for one logging folder.
-#  not quite sure if it would work with multiple CSMLoggers with different app names
+# this will also publish all public methods to globals() for this file.
+_csmLoggerManager = _CSMLoggerManager()
 
-def getLogger(*args, **kwargs):
-    if not CSMLogger.theLogger:
-        raise RuntimeError("CSMLogger.setup() must be called first!")
-
-    return CSMLogger.theLogger.getLogger(*args, **kwargs)
-
-def close():
-    if not CSMLogger.theLogger:
-        raise RuntimeError("CSMLogger.setup() must be called first!")
-    retVal = CSMLogger.theLogger.close()
-    CSMLogger.theLogger = None
-    return retVal
-
-def getCSMLogger():
-    return CSMLogger.theLogger
-
-def enableConsoleLogging(*args, **kwargs):
-    if not CSMLogger.theLogger:
-        raise RuntimeError("CSMLogger.setup() must be called first!")
-
-    return CSMLogger.theLogger.enableConsoleLogging(*args, **kwargs)
-
-def disableConsoleLogging(*args, **kwargs):
-    if not CSMLogger.theLogger:
-        raise RuntimeError("CSMLogger.setup() must be called first!")
-
-    return CSMLogger.theLogger.disableConsoleLogging(*args, **kwargs)
-
-setup = CSMLogger.setup
+# legacy alias for setup()
+CSMLogger.setup = setup
