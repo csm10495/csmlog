@@ -24,7 +24,7 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     include_package_data = True,
-    install_requires=['six'],
+    install_requires=['six', 'gspread'],
     entry_points={
         'console_scripts': [
             'csmlogudp = csmlog.udp_handler_receiver:main'

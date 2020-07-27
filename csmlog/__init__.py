@@ -11,20 +11,22 @@ import sys
 import uuid
 from pathlib import Path
 
+from csmlog.google_sheets_handler import GSheetsHandler
 from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = '0.20.0'
+__version__ = '0.21.0'
 
 
 class CSMLogger(object):
     '''
     object to wrap logging logic
     '''
-    def __init__(self, appName, clearLogs=False, udpLogging=True):
+    def __init__(self, appName, clearLogs=False, udpLogging=True, googleSheetShareEmail=None):
         self.appName = appName
         self.udpLogging = udpLogging
+        self.googleSheetShareEmail = googleSheetShareEmail
 
         if clearLogs:
             self.clearLogs()
@@ -56,6 +58,11 @@ class CSMLogger(object):
             handler.setFormatter(self.getFormatter())
             logger.addHandler(handler)
 
+        if self.googleSheetShareEmail:
+            handler = GSheetsHandler(self.appName, self.googleSheetShareEmail)
+            handler.setFormatter(self.getFormatter())
+            logger.addHandler(handler)
+
         return logger
 
     def __getLoggerWithName(self, loggerName):
@@ -75,6 +82,7 @@ class CSMLogger(object):
         # add the log file path / folder for easy access elsewhere
         logger.logFile = logFile
         logger.logFolder = logFolder
+        logger.loggerName = loggerName
 
         return logger
 
@@ -187,14 +195,14 @@ class _CSMLoggerManager:
 
         return self._activeCsmLogger.disableConsoleLogging(*args, **kwargs)
 
-    def setup(self, appName, clearLogs=False, udpLogging=True):
+    def setup(self, appName, clearLogs=False, udpLogging=True, googleSheetShareEmail=None):
         ''' must be called to setup the logger. Passes args to CSMLogger's constructor '''
 
         if self._activeCsmLogger is not None:
             self._activeCsmLogger.parentLogger.debug("CSMLogger was already setup. Swapping to appName: %s." % appName)
             self._oldCsmLoggers.append(self._activeCsmLogger)
 
-        self._activeCsmLogger = CSMLogger(appName, clearLogs, udpLogging)
+        self._activeCsmLogger = CSMLogger(appName, clearLogs, udpLogging, googleSheetShareEmail)
         self._activeCsmLogger.parentLogger.debug("==== %s is starting ====" % appName)
 
 # this will also publish all public methods to globals() for this file.
