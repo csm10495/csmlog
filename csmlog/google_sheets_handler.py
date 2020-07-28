@@ -9,10 +9,12 @@ import logging.handlers
 import os
 import pathlib
 import pickle
+import re
 import socket
 import sys
 import time
 import threading
+import traceback
 
 import gspread
 import gspread.auth
@@ -30,20 +32,99 @@ GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH = 50_000
 
 LOGGER_SPREADSHEET_PREFIX = f'csmlog/{socket.gethostname()}/'
 
-MAX_EVENTS_TO_PROCESS_PER_INTERVAL = 200_000
+MAX_EVENTS_TO_PROCESS_PER_INTERVAL = 10_000
 
-ROWS_DELETE_WHEN_OUT_OF_SPACE = 200_000
+MAX_OLD_LOG_SHEETS = 10
 
 _GSPREAD = None
 
+# for debugging
+_DEBUG = False
+def _debug_print(s):
+    if _DEBUG:
+        print(s, file=sys.stderr)
+
+class ResourceExhaustedError(RuntimeError):
+    ''' raised if Google Sheets says we have talked to it too much '''
+    pass
+
+class WorkbookSpaceNeededError(RuntimeError):
+    ''' raised if we need more space in the workbook '''
+    pass
+
+class WorksheetRotationNeededError(RuntimeError):
+    ''' raised if we need to rotate to a new worksheet within this workbook '''
+    pass
+
 @contextlib.contextmanager
 def _monkeypatch(mod, name, value):
+    ''' simple contextmanager for monkeypatching an object '''
     real_val = getattr(mod, name)
     setattr(mod, name, value)
     try:
         yield
     finally:
         setattr(mod, name, real_val)
+
+def _natural_sort_worksheet(x):
+    ''' helper to sort worksheets naturally '''
+    l = re.findall('\d+$', x.title)
+    if l:
+        return int(l[0])
+
+    return -1
+
+#### TEST CODE
+
+def wrap(func):
+    def wrapper(*args, **kwargs):
+        _debug_print(f"{datetime.datetime.now()} - About to run:  {func.__name__}")
+        ret_val = func(*args, **kwargs)
+        _debug_print(f"{datetime.datetime.now()} - Completed run: {func.__name__}")
+        return ret_val
+    return wrapper
+
+####
+
+@wrap
+def _handle_resource_exhausted_error():
+    if _DEBUG:
+        traceback.print_stack()
+    time.sleep(3)
+
+def _wrap_for_resource_exhausted(func):
+    def wrapper(*args, **kwargs):
+        while True:
+            try:
+                return func(*args, **kwargs)
+            except Exception as ex:
+                if 'RESOURCE_EXHAUSTED' in str(ex):
+                    _debug_print(ex)
+                    _handle_resource_exhausted_error()
+                    continue
+                raise
+            else:
+                break
+    return wrapper
+
+class _WrapperForResourceExahustionHandling:
+    def __init__(self, gspread):
+        self._gspread = gspread
+
+    def __repr__(self):
+        return repr(self._gspread)
+
+    def __getattribute__(self, name):
+        if name != '_gspread':
+            thing = getattr(self._gspread, name)
+            if callable(thing):
+                return _wrap_for_resource_exhausted(thing)
+            return thing
+        else:
+            return object.__getattribute__(self, name)
+
+    def __iter__(self, *args, **kwargs):
+        return self._gspread.__iter__(self._gspread, *args, **kwargs)
 
 def _login_and_get_gspread(credentials_file):
     ''' login and get a Sheets instance. Will prompt for login if not done before '''
@@ -70,15 +151,15 @@ def _login_and_get_gspread(credentials_file):
 class GSheetsHandler(logging.StreamHandler):
     ''' Special logging handler to send events to a Google Sheet '''
 
-    def __init__(self, logger_name, share_email=None, min_time_per_process_loop=2, credentials_file=CREDENTIALS_FILE):
+    def __init__(self, logger_name, share_email=None, min_time_per_process_loop=1, max_time_per_process_loop=5, credentials_file=CREDENTIALS_FILE):
         self.logger_name = logger_name
-        self.gspread = _login_and_get_gspread(credentials_file)
+        self.gspread = _WrapperForResourceExahustionHandling(_login_and_get_gspread(credentials_file))
 
         self.workbook_name = LOGGER_SPREADSHEET_PREFIX + self.logger_name
         try:
-            self.workbook = self.gspread.open(self.workbook_name)
+            self.workbook = _WrapperForResourceExahustionHandling(self.gspread.open(self.workbook_name))
         except gspread.SpreadsheetNotFound:
-            self.workbook = self.gspread.create(self.workbook_name)
+            self.workbook = _WrapperForResourceExahustionHandling(self.gspread.create(self.workbook_name))
 
         # Ensure there is a log sheet
         self._ensure_default_sheet()
@@ -93,10 +174,14 @@ class GSheetsHandler(logging.StreamHandler):
             self._make_owner_if_not_already()
 
         self.min_time_per_process_loop = min_time_per_process_loop
+        self.max_time_per_process_loop = max_time_per_process_loop
 
         # rows that have not been added yet
         self._pending_rows = []
         self._pending_rows_mutex = threading.Lock()
+
+        # keep track of the amount of time it took to add rows
+        self._add_rows_time = 0
 
         # start processing thread
         self._processing_thread = threading.Thread(target=self._periodically_process_pending_rows, daemon=True)
@@ -120,62 +205,149 @@ class GSheetsHandler(logging.StreamHandler):
         except gspread.WorksheetNotFound:
             self.workbook.add_worksheet(DEFAULT_LOG_WORKSHEET_NAME, 1, 1)
 
-        self.sheet = self.workbook.worksheet(DEFAULT_LOG_WORKSHEET_NAME)
+        self.sheet = _WrapperForResourceExahustionHandling(self.workbook.worksheet(DEFAULT_LOG_WORKSHEET_NAME))
 
-    def _periodically_process_pending_rows(self):
-        while True:
-            before = time.time()
-            self.process_pending_rows()
-            after = time.time()
+    @wrap
+    def _rotate_to_new_sheet_in_workbook(self):
+        all_worksheets = sorted(self.workbook.worksheets(), key=_natural_sort_worksheet)
+        all_worksheets_names = reversed([a.title for a in all_worksheets if a.title.startswith(DEFAULT_LOG_WORKSHEET_NAME)])
 
-            if after - before > self.min_time_per_process_loop:
-                sleep_time = 0
-            else:
-                sleep_time = max(after - before, self.min_time_per_process_loop)
+        def get_worksheet_by_name(name):
+            for i in all_worksheets:
+                if i.title == name:
+                    return i
 
-            time.sleep(sleep_time)
+        new_sheet_list = []
+        for i in all_worksheets_names:
+            num_or_nothing = i.split(DEFAULT_LOG_WORKSHEET_NAME)[1]
+            try:
+                num = int(num_or_nothing)
+            except ValueError:
+                num = -1
 
-    def process_pending_rows(self):
-        print ("Process start")
+            num = num + 1
+
+            wks = _WrapperForResourceExahustionHandling(get_worksheet_by_name(i))
+
+            new_name = f'{DEFAULT_LOG_WORKSHEET_NAME}{num}'
+            wks.update_title(new_name)
+            new_sheet_list.append(wks)
+
+        # remove excess old log sheets
+        sheets_to_remove = list(reversed(new_sheet_list))[MAX_OLD_LOG_SHEETS:]
+        for sheet in sheets_to_remove:
+            _debug_print(f"Deleting sheet: {sheet}")
+            self.workbook.del_worksheet(sheet)
+            new_sheet_list.remove(sheet)
+
+        self._ensure_default_sheet()
+
+        # make the order newest to oldest
+        wks_in_order = [self.sheet] + list(reversed(new_sheet_list))
+        self.workbook.reorder_worksheets(wks_in_order)
+        _debug_print(f"Sheet order: {wks_in_order}")
+
+        # reset the add row time to not let this continually get run.
+        #  the add_rows_time will get set by next add to the sheet
+        self._add_rows_time = 0
+
+    @wrap
+    def _handle_workspace_space_needed_error(self):
+        worksheets = sorted(self.workbook.worksheets(), key=_natural_sort_worksheet)
+        oldest = worksheets[-1]
+        _debug_print(f"Removing sheet: {oldest}")
+        self.workbook.del_worksheet(oldest)
+
+    def _add_rows_to_active_sheet(self, rows):
+        ''' adds the given rows to the currently active sheet. '''
+        start = time.time()
         try:
-            pending_rows_copy = []
-            with self._pending_rows_mutex:
-                if self._pending_rows:
-                    pending_rows_copy = self._pending_rows[:MAX_EVENTS_TO_PROCESS_PER_INTERVAL]
-
-            if pending_rows_copy:
-                print("STARTING APPEND")
-                # todo: if this takes longer than self.min_time_per_process_loop, rotate sheets!
-
-                self.sheet.append_rows(pending_rows_copy)
-                print("ENDING APPEND")
-                # clear processed
-                with self._pending_rows_mutex:
-                    self._pending_rows[:len(pending_rows_copy)] = []
-
-                    if len(self._pending_rows) > 0:
-                        print(f"Not empty... Size: {len(self._pending_rows)}")
-
-            print ("Process end")
+            return self.sheet.append_rows(rows)
         except Exception as ex:
             # this would mean we should wait to write for a bit more.
             if 'RESOURCE_EXHAUSTED' in str(ex).upper():
-                time.sleep(10)
-                return
+                raise ResourceExhaustedError(str(ex))
+
+            # api is down? Act the same as resource exhausted
+            if 'UNAVAILABLE' in str(ex).upper():
+                raise ResourceExhaustedError(str(ex))
 
             # this would mean we have run out of room in this sheet... try to create a new sheet/go to the next one.
             if 'ABOVE THE LIMIT' in str(ex).upper() and 'INVALID_ARGUMENT' in str(ex).upper():
-                print ("ROTATING BEGIN!")
-                # todo, delete oldest sheet instead.
-                self.sheet.delete_rows(1, ROWS_DELETE_WHEN_OUT_OF_SPACE)
-                print ("ROTATING END!")
-                return
+                raise WorkbookSpaceNeededError(str(ex))
 
-            print (f"Exception in process_pending_rows(): {ex}", file=sys.stderr)
+            raise
+        finally:
+            end = time.time()
+            self._add_rows_time = end - start
 
-            # not sure what to do :/
+    def _calculate_periodic_loop_sleep_time(self, time_for_process):
+        ''' calculates the amount of time we should sleep based of the time it took for the
+            process loop to complete '''
+        if time_for_process > self.min_time_per_process_loop:
+            sleep_time = 0
+        else:
+            sleep_time = max(time_for_process, self.min_time_per_process_loop)
+
+        return sleep_time
+
+    def _periodically_process_pending_rows(self):
+        ''' ran in a thread to periodically take rows and write them to sheets.
+        Also may perform other actions such as rotation to keep things working smooth '''
+        while True:
+            try:
+                before = time.time()
+                try:
+                    self.process_pending_rows()
+                except ResourceExhaustedError:
+                    _handle_resource_exhausted_error()
+                    continue
+                except WorkbookSpaceNeededError:
+                    self._handle_workspace_space_needed_error()
+                    continue
+                except Exception as ex:
+                    _debug_print(f"Exception in process_pending_rows(): {ex}")
+                    continue
+
+                if self._add_rows_time > self.max_time_per_process_loop:
+                    # its taking too long to add rows to the sheet. Rotate
+                    _debug_print(f"triggering rotation as the add_rows_time was: {self._add_rows_time}")
+                    self._rotate_to_new_sheet_in_workbook()
+                else:
+                    pass
+                    #_debug_print(f"not triggering rotation as the add_rows_time was: {self._add_rows_time}")
+
+                after = time.time()
+                time.sleep(self._calculate_periodic_loop_sleep_time(after - before))
+            except Exception as ex:
+                _debug_print(f"Exception made it to the top of the loop in _periodically_process_pending_rows(): {traceback.format_exc()}")
+                _handle_resource_exhausted_error()
+                continue
+
+    def process_pending_rows(self):
+        pending_rows_copy = []
+        with self._pending_rows_mutex:
+            if self._pending_rows:
+                # make a copy to not hold up other mutex users
+                pending_rows_copy = self._pending_rows[:MAX_EVENTS_TO_PROCESS_PER_INTERVAL]
+
+        if pending_rows_copy:
+            # an exception on this means things were NOT added to the sheet
+            self._add_rows_to_active_sheet(pending_rows_copy)
+
+            # clear processed
+            with self._pending_rows_mutex:
+                self._pending_rows[:len(pending_rows_copy)] = []
+
+                # if we start printing here, we are logging faster than uploading (falling behind)
+                if len(self._pending_rows) > 0:
+                    _debug_print(f"Not empty... Size: {len(self._pending_rows)}")
 
     def emit(self, record):
+        '''
+        Called when a log record is to be sent. This just queues the events to be written to Sheets.
+            Will also break up msgs that are longer than the max cell size allowed by Google.
+        '''
         rows = [(record.asctime, record.levelname, record.pathname, record.funcName, record.lineno, record.msg),]
 
         if len(record.msg) > GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH:
@@ -188,28 +360,12 @@ class GSheetsHandler(logging.StreamHandler):
             for row in rows:
                 self._pending_rows.append(row)
 
+    def flush(self):
+        ''' Call to wait until all events have been reflected to sheets.
+        Note: This can hang forever if we can't write to Google Sheets as fast as logging is currently happening '''
+        while True:
+            with self._pending_rows_mutex:
+                if len(self._pending_rows) == 0:
+                    break
 
-"""
-    def _rotate_workbooks(self):
-        ''' called if the current default worksheet is too large. '''
-        all_worksheets = self.workbook.worksheets()
-        all_worksheets_names = reversed(sorted([a.title for a in all_worksheets if a.title.startswith(DEFAULT_LOG_WORKSHEET_NAME)]))
-
-        def get_worksheet_by_name(name):
-            for i in all_worksheets:
-                if i.title == name:
-                    return i
-
-        for i in all_worksheets_names:
-            num_or_nothing = i.split(DEFAULT_LOG_WORKSHEET_NAME)[1]
-            try:
-                num = int(num_or_nothing)
-            except ValueError:
-                num = -1
-
-            num = num + 1
-
-            get_worksheet_by_name(i).update_title(f'{DEFAULT_LOG_WORKSHEET_NAME}{num}')
-
-        self._ensure_default_sheet()
-"""
+            time.sleep(.1)
