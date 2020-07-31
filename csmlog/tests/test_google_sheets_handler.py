@@ -12,13 +12,13 @@ sys.path.insert(0, PARENT_FOLDER)
 
 import google_sheets_handler
 from google_sheets_handler import _monkeypatch, _natural_sort_worksheet, _wrap_for_resource_exhausted, \
-     _WrapperForResourceExahustionHandling, _login_and_get_gspread, GSheetsHandler, ResourceExhaustedError, \
+     _WrapperForResourceExhaustionHandling, _login_and_get_gspread, GSheetsHandler, ResourceExhaustedError, \
      WorkbookSpaceNeededError, MAX_EVENTS_TO_SPLIT_TO_NEW_SHEET, DEFAULT_LOG_WORKSHEET_NAME, LOGGER_SPREADSHEET_PREFIX
 
 @pytest.fixture(scope="function")
 def gsheets_handler():
     # remove logic for exhaustion handling
-    with _monkeypatch(google_sheets_handler, '_WrapperForResourceExahustionHandling', lambda x: x):
+    with _monkeypatch(google_sheets_handler, '_WrapperForResourceExhaustionHandling', lambda x: x):
         google_sheets_handler._GSPREAD = unittest.mock.MagicMock()
         try:
             g = GSheetsHandler('unit_tests', min_time_per_process_loop=0, start_processing_thread=False)
@@ -31,7 +31,7 @@ def gsheets_handler():
 @pytest.fixture(scope="function")
 def gsheets_handler_no_thread():
     # remove logic for exhaustion handling
-    with _monkeypatch(google_sheets_handler, '_WrapperForResourceExahustionHandling', lambda x: x):
+    with _monkeypatch(google_sheets_handler, '_WrapperForResourceExhaustionHandling', lambda x: x):
         google_sheets_handler._GSPREAD = unittest.mock.MagicMock()
         try:
             g = GSheetsHandler('unit_tests', min_time_per_process_loop=0, start_processing_thread=False)
@@ -87,7 +87,7 @@ def test_exhaustion_handling_object():
 
     with unittest.mock.patch.object(google_sheets_handler, '_wrap_for_resource_exhausted') as mock:
         # callables should get wrapped
-        w = _WrapperForResourceExahustionHandling(Test())
+        w = _WrapperForResourceExhaustionHandling(Test())
         assert w.attr == 123
         assert isinstance(w.attr, int)
         assert isinstance(w.method, unittest.mock.Mock)

@@ -112,7 +112,7 @@ def _wrap_for_resource_exhausted(func):
                 raise
     return wrapper
 
-class _WrapperForResourceExahustionHandling:
+class _WrapperForResourceExhaustionHandling:
     '''
     A special object that takes in a gspread-based object. All calls are passed through to that object.
     When callables are given back, they will be wrapped to auto-retry on resource exhaustion
@@ -162,13 +162,13 @@ class GSheetsHandler(logging.StreamHandler):
         ''' initializer. start_processing_thread should be True unless you don't actually want to process log events
         share_email can be an email address to share the Google Sheet workbook with. '''
         self.logger_name = logger_name
-        self.gspread = _WrapperForResourceExahustionHandling(_login_and_get_gspread(credentials_file))
+        self.gspread = _WrapperForResourceExhaustionHandling(_login_and_get_gspread(credentials_file))
 
         self.workbook_name = LOGGER_SPREADSHEET_PREFIX + self.logger_name
         try:
-            self.workbook = _WrapperForResourceExahustionHandling(self.gspread.open(self.workbook_name))
+            self.workbook = _WrapperForResourceExhaustionHandling(self.gspread.open(self.workbook_name))
         except gspread.SpreadsheetNotFound:
-            self.workbook = _WrapperForResourceExahustionHandling(self.gspread.create(self.workbook_name))
+            self.workbook = _WrapperForResourceExhaustionHandling(self.gspread.create(self.workbook_name))
 
         # Ensure there is a log sheet
         self._ensure_default_sheet()
@@ -213,9 +213,9 @@ class GSheetsHandler(logging.StreamHandler):
 
     def _ensure_default_sheet(self):
         try:
-            self.sheet = _WrapperForResourceExahustionHandling(self.workbook.worksheet(DEFAULT_LOG_WORKSHEET_NAME))
+            self.sheet = _WrapperForResourceExhaustionHandling(self.workbook.worksheet(DEFAULT_LOG_WORKSHEET_NAME))
         except gspread.WorksheetNotFound:
-            self.sheet = _WrapperForResourceExahustionHandling(self.workbook.add_worksheet(DEFAULT_LOG_WORKSHEET_NAME, 1, 1))
+            self.sheet = _WrapperForResourceExhaustionHandling(self.workbook.add_worksheet(DEFAULT_LOG_WORKSHEET_NAME, 1, 1))
 
         self.rows_in_active_sheet = self.sheet.row_count
 
@@ -239,7 +239,7 @@ class GSheetsHandler(logging.StreamHandler):
 
             num = num + 1
 
-            wks = _WrapperForResourceExahustionHandling(get_worksheet_by_name(i))
+            wks = _WrapperForResourceExhaustionHandling(get_worksheet_by_name(i))
 
             new_name = f'{DEFAULT_LOG_WORKSHEET_NAME}{num}'
             wks.update_title(new_name)
