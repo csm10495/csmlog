@@ -110,8 +110,6 @@ def _wrap_for_resource_exhausted(func):
                     _handle_resource_exhausted_error()
                     continue
                 raise
-            else:
-                break
     return wrapper
 
 class _WrapperForResourceExahustionHandling:
@@ -215,11 +213,10 @@ class GSheetsHandler(logging.StreamHandler):
 
     def _ensure_default_sheet(self):
         try:
-            self.workbook.worksheet(DEFAULT_LOG_WORKSHEET_NAME)
+            self.sheet = _WrapperForResourceExahustionHandling(self.workbook.worksheet(DEFAULT_LOG_WORKSHEET_NAME))
         except gspread.WorksheetNotFound:
-            self.workbook.add_worksheet(DEFAULT_LOG_WORKSHEET_NAME, 1, 1)
+            self.sheet = _WrapperForResourceExahustionHandling(self.workbook.add_worksheet(DEFAULT_LOG_WORKSHEET_NAME, 1, 1))
 
-        self.sheet = _WrapperForResourceExahustionHandling(self.workbook.worksheet(DEFAULT_LOG_WORKSHEET_NAME))
         self.rows_in_active_sheet = self.sheet.row_count
 
     @_debug_wrap
@@ -267,7 +264,7 @@ class GSheetsHandler(logging.StreamHandler):
         self._add_rows_time = 0
 
     @_debug_wrap
-    def _handle_workspace_space_needed_error(self):
+    def _handle_workbook_space_needed_error(self):
         worksheets = sorted(self.workbook.worksheets(), key=_natural_sort_worksheet)
         oldest = worksheets[-1]
         _debug_print(f"Removing sheet: {oldest}")
@@ -320,7 +317,7 @@ class GSheetsHandler(logging.StreamHandler):
                     _handle_resource_exhausted_error()
                     continue
                 except WorkbookSpaceNeededError:
-                    self._handle_workspace_space_needed_error()
+                    self._handle_workbook_space_needed_error()
                     continue
                 except Exception as ex:
                     _debug_print(f"Exception in process_pending_rows(): {ex}")

@@ -13,7 +13,7 @@ sys.path.insert(0, PARENT_FOLDER)
 import google_sheets_handler
 from google_sheets_handler import _monkeypatch, _natural_sort_worksheet, _wrap_for_resource_exhausted, \
      _WrapperForResourceExahustionHandling, _login_and_get_gspread, GSheetsHandler, ResourceExhaustedError, \
-     WorkbookSpaceNeededError, MAX_EVENTS_TO_SPLIT_TO_NEW_SHEET
+     WorkbookSpaceNeededError, MAX_EVENTS_TO_SPLIT_TO_NEW_SHEET, DEFAULT_LOG_WORKSHEET_NAME, LOGGER_SPREADSHEET_PREFIX
 
 @pytest.fixture(scope="function")
 def gsheets_handler():
@@ -95,7 +95,6 @@ def test_exhaustion_handling_object():
 def test_login_and_get_gspread():
     google_sheets_handler._GSPREAD = 45
     assert _login_and_get_gspread(None) == 45
-
 
     google_sheets_handler._GSPREAD = None
     with pytest.raises(FileNotFoundError):
@@ -194,7 +193,7 @@ def test_gsheets_periodically_process_pending_rows_workbook_space_needed(gsheets
         raise WorkbookSpaceNeededError
 
     with unittest.mock.patch.object(gsheets_handler_no_thread, 'process_pending_rows', side_effect=side_effect):
-        with unittest.mock.patch.object(gsheets_handler_no_thread, '_handle_workspace_space_needed_error') as mock:
+        with unittest.mock.patch.object(gsheets_handler_no_thread, '_handle_workbook_space_needed_error') as mock:
             gsheets_handler_no_thread._periodically_process_pending_rows()
             mock.assert_called_once()
 
@@ -286,3 +285,81 @@ def test_gsheets_add_rows_to_active_sheet_set_coerce_to_correct_exceptions(gshee
         with pytest.raises(EnvironmentError):
             gsheets_handler_no_thread._add_rows_to_active_sheet([])
         mock.assert_called_once()
+
+def test_gsheets_handle_workbook_space_needed(gsheets_handler_no_thread):
+    class FakeWorksheet:
+        def __init__(self, title):
+            self.title = title
+        def __eq__(self, other):
+            return self.title == other.title
+
+    worksheets = [FakeWorksheet('log2'), FakeWorksheet('log0'), FakeWorksheet('log1')]
+    with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'worksheets', return_value=worksheets) as mock:
+        with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'del_worksheet') as del_wks_mock:
+            gsheets_handler_no_thread._handle_workbook_space_needed_error()
+
+            mock.assert_called_once()
+            del_wks_mock.assert_called_once_with(FakeWorksheet('log2'))
+
+def test_gsheets_init_creates_workbook_if_it_doesnt_exist(gsheets_handler_no_thread):
+    with unittest.mock.patch.object(gsheets_handler_no_thread.gspread, 'open') as open_mock:
+        with unittest.mock.patch.object(gsheets_handler_no_thread.gspread, 'create') as create_mock:
+            gsheets_handler_no_thread.__init__('test')
+            open_mock.assert_called_once_with(LOGGER_SPREADSHEET_PREFIX + 'test')
+            create_mock.assert_not_called()
+
+    with unittest.mock.patch.object(gsheets_handler_no_thread.gspread, 'open', side_effect=gspread.SpreadsheetNotFound()) as open_mock:
+        with unittest.mock.patch.object(gsheets_handler_no_thread.gspread, 'create') as create_mock:
+            gsheets_handler_no_thread.__init__('test')
+            open_mock.assert_called_once_with(LOGGER_SPREADSHEET_PREFIX + 'test')
+            create_mock.assert_called_once_with(LOGGER_SPREADSHEET_PREFIX + 'test')
+
+def test_gsheets_init_calls_make_owner_if_not_already_if_email_given(gsheets_handler_no_thread):
+    with unittest.mock.patch.object(gsheets_handler_no_thread, '_make_owner_if_not_already') as mock:
+        gsheets_handler_no_thread.__init__('test')
+        mock.assert_not_called()
+        gsheets_handler_no_thread.__init__('test', share_email='testemail@bleh.net')
+        mock.assert_called_once()
+
+def test_gsheets_make_owner_if_not_already(gsheets_handler_no_thread):
+    gsheets_handler_no_thread.share_email = 'bleh2@bleh.net'
+
+    with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'list_permissions', return_value=[
+        {
+            'emailAddress' : 'bleh@bleh.net',
+            'role' : 'owner',
+            'type' : 'user',
+        },
+    ]) as list_permissions_mock:
+        with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'share') as share_mock:
+            gsheets_handler_no_thread._make_owner_if_not_already()
+            list_permissions_mock.assert_called_once()
+            share_mock.assert_called_once_with('bleh2@bleh.net', perm_type='user', role='owner')
+
+            list_permissions_mock.reset_mock()
+            share_mock.reset_mock()
+
+            gsheets_handler_no_thread.share_email = 'bleh@bleh.net'
+            gsheets_handler_no_thread._make_owner_if_not_already()
+            list_permissions_mock.assert_called_once()
+            share_mock.assert_not_called()
+
+def test_gsheets_ensure_default_sheet(gsheets_handler_no_thread):
+    class FakeWorksheet:
+        def __init__(self, r):
+            self.row_count = r
+
+    with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'worksheet', return_value=FakeWorksheet(123)) as worksheet_mock:
+        with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'add_worksheet') as add_worksheet_mock:
+            gsheets_handler_no_thread._ensure_default_sheet()
+            worksheet_mock.assert_called_once_with(DEFAULT_LOG_WORKSHEET_NAME)
+            add_worksheet_mock.assert_not_called()
+            assert gsheets_handler_no_thread.rows_in_active_sheet == 123
+
+    with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'worksheet', side_effect=gspread.WorksheetNotFound()) as worksheet_mock:
+        with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'add_worksheet', return_value=FakeWorksheet(432)) as add_worksheet_mock:
+            gsheets_handler_no_thread._ensure_default_sheet()
+            worksheet_mock.assert_called_once_with(DEFAULT_LOG_WORKSHEET_NAME)
+            add_worksheet_mock.assert_called_once_with(DEFAULT_LOG_WORKSHEET_NAME, 1, 1)
+            assert gsheets_handler_no_thread.rows_in_active_sheet == 432
+
