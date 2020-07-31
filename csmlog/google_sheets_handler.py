@@ -356,13 +356,14 @@ class GSheetsHandler(logging.StreamHandler):
         Called when a log record is to be sent. This just queues the events to be written to Sheets.
             Will also break up msgs that are longer than the max cell size allowed by Google.
         '''
-        rows = [(record.asctime, record.levelname, record.pathname, record.funcName, record.lineno, record.msg),]
+        full_record_msg_str = str(record.msg)
+        rows = [(record.asctime, record.levelname, record.pathname, record.funcName, record.lineno, full_record_msg_str),]
 
-        if len(record.msg) > GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH:
+        if len(full_record_msg_str) > GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH:
             rows = []
             # split row into multiple
-            for i in range(0, len(record.msg), GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH):
-                rows.append((record.asctime, record.levelname, record.pathname, record.funcName, record.lineno, record.msg[i:i+GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH]),)
+            for i in range(0, len(full_record_msg_str), GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH):
+                rows.append((record.asctime, record.levelname, record.pathname, record.funcName, record.lineno, full_record_msg_str[i:i+GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH]),)
 
         with self._pending_rows_mutex:
             for row in rows:

@@ -129,6 +129,10 @@ def test_gsheets_handler_emit(gsheets_handler):
     gsheets_handler.emit(get_record('hello'))
     assert gsheets_handler._pending_rows[-1][-1] == 'hello'
 
+    # send to pending rows (non-str)
+    gsheets_handler.emit(get_record(123))
+    assert gsheets_handler._pending_rows[-1][-1] == '123'
+
     # send to pending rows (too long, so should split)
     gsheets_handler.emit(get_record(('A' * google_sheets_handler.GOOGLE_SHEETS_MAX_CELL_CHAR_LENGTH) + 'B'))
     B = gsheets_handler._pending_rows[-1]
