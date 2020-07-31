@@ -15,6 +15,7 @@ import sys
 import time
 import threading
 import traceback
+import unittest
 
 import gspread
 import gspread.auth
@@ -75,12 +76,8 @@ class WorksheetRotationNeededError(RuntimeError):
 @contextlib.contextmanager
 def _monkeypatch(mod, name, value):
     ''' simple contextmanager for monkeypatching an object '''
-    real_val = getattr(mod, name)
-    setattr(mod, name, value)
-    try:
+    with unittest.mock.patch.object(mod, name, value):
         yield
-    finally:
-        setattr(mod, name, real_val)
 
 def _natural_sort_worksheet(x):
     ''' helper to sort worksheets naturally '''

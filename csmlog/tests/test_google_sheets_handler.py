@@ -363,3 +363,57 @@ def test_gsheets_ensure_default_sheet(gsheets_handler_no_thread):
             add_worksheet_mock.assert_called_once_with(DEFAULT_LOG_WORKSHEET_NAME, 1, 1)
             assert gsheets_handler_no_thread.rows_in_active_sheet == 432
 
+class TestGSheetsSheetRotation:
+    @classmethod
+    def getFakeWorksheet(cls, suffix=''):
+        class FakeWorksheet:
+            def __init__(self, suffix):
+                self.title = DEFAULT_LOG_WORKSHEET_NAME + str(suffix)
+            def __repr__(self):
+                return f'<FakeWorksheet: {self.title}>'
+            def update_title(self, title):
+                self.title = title
+            def __eq__(self, other):
+                return self.title == other.title
+            def __hash__(self):
+                return hash(self.title)
+
+        return FakeWorksheet(suffix)
+
+    def test_rotation_updates_titles(self, gsheets_handler_no_thread):
+        def ensure_default_sheet():
+            gsheets_handler_no_thread.sheet = self.getFakeWorksheet()
+
+        # set to non-zero before testing
+        gsheets_handler_no_thread._add_rows_time = 913
+
+        worksheets = [self.getFakeWorksheet(5), self.getFakeWorksheet()]
+        with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'worksheets', return_value=worksheets) as worksheets_mock:
+            with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'reorder_worksheets') as reorder_worksheets_mock:
+                with unittest.mock.patch.object(gsheets_handler_no_thread, '_ensure_default_sheet', side_effect=ensure_default_sheet) as ensure_default_sheet_mock:
+                    gsheets_handler_no_thread._rotate_to_new_sheet_in_workbook()
+                    worksheets_mock.assert_called_once()
+                    reorder_worksheets_mock.assert_called_once_with([self.getFakeWorksheet(), self.getFakeWorksheet(0), self.getFakeWorksheet(6)])
+                    ensure_default_sheet_mock.assert_called_once()
+
+                    # check this was reset while here.
+                    assert gsheets_handler_no_thread._add_rows_time == 0
+
+    def test_rotation_removes_excess_old_sheets(self, gsheets_handler_no_thread):
+        def ensure_default_sheet():
+            gsheets_handler_no_thread.sheet = self.getFakeWorksheet()
+
+        deleted_worksheets = []
+        def del_worksheet(wks):
+            deleted_worksheets.append(wks)
+
+        worksheets = [self.getFakeWorksheet(5), self.getFakeWorksheet(), self.getFakeWorksheet(1), self.getFakeWorksheet(3), self.getFakeWorksheet(2)]
+        with _monkeypatch(google_sheets_handler, 'MAX_OLD_LOG_SHEETS', 3):
+            with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'worksheets', return_value=worksheets) as worksheets_mock:
+                with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'reorder_worksheets') as reorder_worksheets_mock:
+                    with unittest.mock.patch.object(gsheets_handler_no_thread, '_ensure_default_sheet', side_effect=ensure_default_sheet) as ensure_default_sheet_mock:
+                        with unittest.mock.patch.object(gsheets_handler_no_thread.workbook, 'del_worksheet', side_effect=del_worksheet) as ensure_default_sheet_mock:
+                            gsheets_handler_no_thread._rotate_to_new_sheet_in_workbook()
+
+                            assert set(deleted_worksheets) == set([self.getFakeWorksheet(6), self.getFakeWorksheet(4)])
+                            reorder_worksheets_mock.assert_called_once_with([gsheets_handler_no_thread.sheet, self.getFakeWorksheet(0), self.getFakeWorksheet(2), self.getFakeWorksheet(3)])
