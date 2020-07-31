@@ -262,7 +262,7 @@ def test_gsheets_calculate_periodic_loop_sleep_time(gsheets_handler_no_thread):
 def test_gsheets_add_rows_to_active_sheet_sets_add_rows_time(gsheets_handler_no_thread):
     gsheets_handler_no_thread._add_rows_time = 99
     assert isinstance(gsheets_handler_no_thread._add_rows_to_active_sheet([]), unittest.mock.Mock)
-    assert gsheets_handler_no_thread._add_rows_time < 99 and gsheets_handler_no_thread._add_rows_time > 0
+    assert gsheets_handler_no_thread._add_rows_time < 99 and gsheets_handler_no_thread._add_rows_time >= 0
 
 def test_gsheets_add_rows_to_active_sheet_set_coerce_to_correct_exceptions(gsheets_handler_no_thread):
     with unittest.mock.patch.object(gsheets_handler_no_thread.sheet, 'append_rows', side_effect=Exception("RESOURCE_EXHAUSTED uh-oh")) as mock:
