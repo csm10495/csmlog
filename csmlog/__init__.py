@@ -16,7 +16,7 @@ from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = '0.21.1'
+__version__ = '0.22.0'
 
 
 class CSMLogger(object):
@@ -75,7 +75,27 @@ class CSMLogger(object):
 
         formatter = self.getFormatter()
 
-        rfh = logging.handlers.RotatingFileHandler(logFile, maxBytes=1024*1024*8, backupCount=10)
+        class RotatingFileHandlerThatWillKeepWorkingOnPermissionErrorDuringRotate(logging.handlers.RotatingFileHandler):
+            '''
+                This class is special, it exists because on Windows, file names can't be changed while files are open.
+                    So ultimately we can't rotate if 2 processes are writing to a given log file.
+                    The default RotatingFileHandler will just throw the PermissionError and stop writing
+                            (since it closed the stream already)
+                    By throwing away the PermissionError (since logging it on every log statement would be too much),
+                        and using the delay=True parameter to RotatingFileHandler, we will just continue writing to the
+                        original file without rotating, via reopening the original file. If the other process closes the file,
+                        it will rotate on the next log statement
+            '''
+
+            # todo: probably write test cases for rotation with multiple processes writing to one log file.
+            #   ensure some sort of semi-deterministic behavior
+            def rotate(self, source, dest):
+                try:
+                    logging.handlers.RotatingFileHandler.rotate(self, source, dest)
+                except PermissionError:
+                    pass
+
+        rfh = RotatingFileHandlerThatWillKeepWorkingOnPermissionErrorDuringRotate(logFile, maxBytes=1024*1024*8, backupCount=10, delay=True)
         rfh.setFormatter(formatter)
         logger.addHandler(rfh)
 

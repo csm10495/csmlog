@@ -182,5 +182,9 @@ def test_logged_system_call(csmlog):
 def test_added_attrs_on_logger(csmlog):
     ''' we add in the logFolder/logFile to the python logger. Make sure they are there '''
     tmp = csmlog.getLogger('tmp2')
-    assert pathlib.Path(tmp.logFile).is_file()
     assert pathlib.Path(tmp.logFolder).is_dir()
+
+    # file shouldn't exist till a log statement happens
+    assert not pathlib.Path(tmp.logFile).is_file()
+    tmp.info("hi")
+    assert pathlib.Path(tmp.logFile).is_file()
