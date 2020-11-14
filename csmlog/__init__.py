@@ -16,7 +16,7 @@ from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = '0.22.0'
+__version__ = '0.23.0'
 
 
 class CSMLogger(object):

@@ -1,6 +1,6 @@
 # csmlog
 
-[![Build Status](https://csm10495.visualstudio.com/csmlog/_apis/build/status/csmlog-CI?branchName=master)](https://csm10495.visualstudio.com/csmlog/_build/latest?definitionId=4?branchName=master)
+[![Build Status](https://github.com/csm10495/csmlog/workflows/Release/badge.svg)](https://github.com/csm10495/csmlog/actions)
 
 Package to setup a python logger the way I like to use it.
 
