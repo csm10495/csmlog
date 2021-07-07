@@ -16,7 +16,7 @@ from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = '0.24.0'
+__version__ = '0.25.0'
 
 DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s'
 
@@ -237,7 +237,9 @@ class _CSMLoggerManager:
         if not self._activeCsmLogger:
             raise RuntimeError("(csmlog) setup() must be called first!")
 
-        return self._activeCsmLogger.setFormatter(formatter)
+        self._activeCsmLogger.setFormatter(formatter)
+        for logger in self._oldCsmLoggers:
+            logger.setFormatter(formatter)
 
     def setup(self, appName, clearLogs=False, udpLogging=True, googleSheetShareEmail=None):
         ''' must be called to setup the logger. Passes args to CSMLogger's constructor '''
