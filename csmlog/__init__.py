@@ -1,6 +1,6 @@
 '''
 This file is part of csmlog. Python logger setup... the way I like it.
-MIT License (2020) - Charles Machalow
+MIT License (2021) - Charles Machalow
 '''
 
 import logging
@@ -16,17 +16,22 @@ from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = '0.23.0'
+__version__ = '0.24.0'
 
+DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s'
 
 class CSMLogger(object):
     '''
     object to wrap logging logic
     '''
-    def __init__(self, appName, clearLogs=False, udpLogging=True, googleSheetShareEmail=None):
+    def __init__(self, appName, clearLogs=False, udpLogging=True, googleSheetShareEmail=None, formatter=None):
         self.appName = appName
         self.udpLogging = udpLogging
         self.googleSheetShareEmail = googleSheetShareEmail
+        self._loggers = []
+
+        # sets self._formatter
+        self.setFormatter(formatter)
 
         if clearLogs:
             self.clearLogs()
@@ -107,7 +112,7 @@ class CSMLogger(object):
         return logger
 
     def getFormatter(self):
-        return logging.Formatter('%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s')
+        return self._formatter
 
     def getDefaultSaveDirectory(self):
         return self.getDefaultSaveDirectoryWithName(self.appName)
@@ -135,6 +140,19 @@ class CSMLogger(object):
 
         self.parentLogger.removeHandler(self.consoleLoggingStream)
         self.consoleLoggingStream = None
+
+    def setFormatter(self, formatter=None):
+        if formatter is None:
+            formatter = logging.Formatter(DEFAULT_LOG_FORMAT)
+
+        if isinstance(formatter, str):
+            formatter = logging.Formatter(formatter)
+
+        self._formatter = formatter
+
+        for logger in self._loggers:
+            for handler in logger.handlers:
+                handler.setFormatter(formatter)
 
     @classmethod
     def getDefaultSaveDirectoryWithName(cls, appName):
@@ -214,6 +232,12 @@ class _CSMLoggerManager:
             raise RuntimeError("(csmlog) setup() must be called first!")
 
         return self._activeCsmLogger.disableConsoleLogging(*args, **kwargs)
+
+    def setFormatter(self, formatter=None):
+        if not self._activeCsmLogger:
+            raise RuntimeError("(csmlog) setup() must be called first!")
+
+        return self._activeCsmLogger.setFormatter(formatter)
 
     def setup(self, appName, clearLogs=False, udpLogging=True, googleSheetShareEmail=None):
         ''' must be called to setup the logger. Passes args to CSMLogger's constructor '''

@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import subprocess
 import sys
@@ -188,3 +189,25 @@ def test_added_attrs_on_logger(csmlog):
     assert not pathlib.Path(tmp.logFile).is_file()
     tmp.info("hi")
     assert pathlib.Path(tmp.logFile).is_file()
+
+
+def test_formatter_setting(csmlog):
+    logger = csmlog.getLogger('log')
+    logger.debug("helloworld")
+    assert 'DEBUG' in pathlib.Path(logger.logFile).read_text()
+
+    csmlog.setFormatter('%(created)f')
+    logger.debug("helloworld")
+    assert 'helloworld' not in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
+
+    csmlog.setFormatter(logging.Formatter('%(created)f'))
+    logger.debug("helloworld")
+    assert 'helloworld' not in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
+
+    logger2 = csmlog.getLogger('log2')
+    logger2.debug("helloworld")
+    assert 'helloworld' not in pathlib.Path(logger2.logFile).read_text().splitlines()[-1]
+
+    csmlog.setFormatter()
+    logger.debug("helloworld")
+    assert 'helloworld' in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
