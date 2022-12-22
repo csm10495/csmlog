@@ -27,6 +27,11 @@ Internally the gspread module is used for Google Sheets communication/authentica
 
 Note that logs may be delayed due to rate limiting, etc. If you are logging *a lot*, it may not be a good idea to enable this feature.
 
+
+## Customized Child Loggers
+`setup()` has an optional parameter: `modifyChildLoggersFunc`. If it is given, it must be a function that would take in each created child logger
+and return a child logger. This can be used to add additional things like handlers to each child logger.
+
 ## Installation
 ```
 pip install csmlog

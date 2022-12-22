@@ -1,7 +1,7 @@
-'''
+"""
 This file is part of csmlog. Python logger setup... the way I like it.
 MIT License (2019) - Charles Machalow
-'''
+"""
 
 import socket
 import sys
@@ -9,27 +9,28 @@ import threading
 
 MAX_UDP_PACKET_SIZE = 65535
 
+
 class UdpHandlerReceiver(object):
-    ''' receiver to print live logs as raw text from a UDP socket '''
-    def __init__(self, ip='127.0.0.1', port=5123, bufferMaxSize=MAX_UDP_PACKET_SIZE):
+    """receiver to print live logs as raw text from a UDP socket"""
+
+    def __init__(self, ip="127.0.0.1", port=5123, bufferMaxSize=MAX_UDP_PACKET_SIZE):
         self.ip = ip
         self.port = port
         self.bufferMaxSize = bufferMaxSize
 
-
         self.__stop = False
         self.__lock = threading.Lock()
-        self.__buffer = ''
+        self.__buffer = ""
 
     def __repr__(self):
-        return '<UdpHandlerReceiver %s:%s>' % (self.ip, self.port)
+        return "<UdpHandlerReceiver %s:%s>" % (self.ip, self.port)
 
     def _appendToBuffer(self, data):
         with self.__lock:
             self.__buffer += data
 
             # chop buffer to latest x items
-            self.__buffer = self.__buffer[-self.bufferMaxSize:]
+            self.__buffer = self.__buffer[-self.bufferMaxSize :]
 
     def getBuffer(self):
         with self.__lock:
@@ -63,9 +64,11 @@ class UdpHandlerReceiver(object):
             self.socket.close()
             del self.socket
 
+
 def main():
     u = UdpHandlerReceiver()
     u.recieveForever()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

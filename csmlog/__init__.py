@@ -1,7 +1,7 @@
-'''
+"""
 This file is part of csmlog. Python logger setup... the way I like it.
 MIT License (2021) - Charles Machalow
-'''
+"""
 
 import logging
 import logging.handlers
@@ -16,18 +16,33 @@ from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = '0.25.0'
+__version__ = "0.26.0"
 
-DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s'
+DEFAULT_LOG_FORMAT = "%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s"
+
 
 class CSMLogger(object):
-    '''
+    """
     object to wrap logging logic
-    '''
-    def __init__(self, appName, clearLogs=False, udpLogging=True, googleSheetShareEmail=None, formatter=None):
+    """
+
+    def __init__(
+        self,
+        appName,
+        clearLogs=False,
+        udpLogging=True,
+        googleSheetShareEmail=None,
+        formatter=None,
+        modifyChildLoggersFunc=None,
+    ):
         self.appName = appName
         self.udpLogging = udpLogging
         self.googleSheetShareEmail = googleSheetShareEmail
+
+        # A function to call when creating a child logger. This is useful for adding in
+        # things like handlers to all child loggers.
+        self.modifyChildLoggersFunc = modifyChildLoggersFunc
+
         self._loggers = []
 
         # sets self._formatter
@@ -38,7 +53,7 @@ class CSMLogger(object):
 
         self.parentLogger = self.__getParentLogger()
         self.consoleLoggingStream = None
-        self._loggers = [self.parentLogger] # keep track of all loggers
+        self._loggers = [self.parentLogger]  # keep track of all loggers
 
     def close(self):
         for logger in self._loggers:
@@ -50,10 +65,17 @@ class CSMLogger(object):
 
     def getLogger(self, name):
         name = os.path.basename(name)
-        loggerName = '%s.%s' % (self.appName, name) # make this a sublogger of the whole app
+        loggerName = "%s.%s" % (
+            self.appName,
+            name,
+        )  # make this a sublogger of the whole app
         logger = self.__getLoggerWithName(loggerName)
         self._loggers.append(logger)
         logger.sysCall = LoggedSystemCall(logger)
+
+        if self.modifyChildLoggersFunc:
+            logger = self.modifyChildLoggersFunc(logger)
+
         return logger
 
     def __getParentLogger(self):
@@ -72,7 +94,7 @@ class CSMLogger(object):
 
     def __getLoggerWithName(self, loggerName):
         logger = logging.getLogger(loggerName)
-        logger.setLevel(1) # log all
+        logger.setLevel(1)  # log all
 
         logFolder = self.getDefaultSaveDirectory()
 
@@ -80,17 +102,19 @@ class CSMLogger(object):
 
         formatter = self.getFormatter()
 
-        class RotatingFileHandlerThatWillKeepWorkingOnPermissionErrorDuringRotate(logging.handlers.RotatingFileHandler):
-            '''
-                This class is special, it exists because on Windows, file names can't be changed while files are open.
-                    So ultimately we can't rotate if 2 processes are writing to a given log file.
-                    The default RotatingFileHandler will just throw the PermissionError and stop writing
-                            (since it closed the stream already)
-                    By throwing away the PermissionError (since logging it on every log statement would be too much),
-                        and using the delay=True parameter to RotatingFileHandler, we will just continue writing to the
-                        original file without rotating, via reopening the original file. If the other process closes the file,
-                        it will rotate on the next log statement
-            '''
+        class RotatingFileHandlerThatWillKeepWorkingOnPermissionErrorDuringRotate(
+            logging.handlers.RotatingFileHandler
+        ):
+            """
+            This class is special, it exists because on Windows, file names can't be changed while files are open.
+                So ultimately we can't rotate if 2 processes are writing to a given log file.
+                The default RotatingFileHandler will just throw the PermissionError and stop writing
+                        (since it closed the stream already)
+                By throwing away the PermissionError (since logging it on every log statement would be too much),
+                    and using the delay=True parameter to RotatingFileHandler, we will just continue writing to the
+                    original file without rotating, via reopening the original file. If the other process closes the file,
+                    it will rotate on the next log statement
+            """
 
             # todo: probably write test cases for rotation with multiple processes writing to one log file.
             #   ensure some sort of semi-deterministic behavior
@@ -100,7 +124,9 @@ class CSMLogger(object):
                 except PermissionError:
                     pass
 
-        rfh = RotatingFileHandlerThatWillKeepWorkingOnPermissionErrorDuringRotate(logFile, maxBytes=1024*1024*8, backupCount=10, delay=True)
+        rfh = RotatingFileHandlerThatWillKeepWorkingOnPermissionErrorDuringRotate(
+            logFile, maxBytes=1024 * 1024 * 8, backupCount=10, delay=True
+        )
         rfh.setFormatter(formatter)
         logger.addHandler(rfh)
 
@@ -156,17 +182,17 @@ class CSMLogger(object):
 
     @classmethod
     def getDefaultSaveDirectoryWithName(cls, appName):
-        if os.name == 'nt':
+        if os.name == "nt":
             logFolder = os.path.join(os.path.expandvars("%APPDATA%"), appName)
         else:
-            tmpPath = Path(f'/var/log/{uuid.uuid4()}')
+            tmpPath = Path(f"/var/log/{uuid.uuid4()}")
             try:
                 tmpPath.touch()
                 tmpPath.unlink()
                 tmpPath = tmpPath.parent
             except PermissionError:
                 # can't use /var/log... try using ~/log/
-                tmpPath = Path.home() / 'log'
+                tmpPath = Path.home() / "log"
                 tmpPath.mkdir(exist_ok=True)
 
             logFolder = tmpPath / appName
@@ -182,8 +208,9 @@ class CSMLogger(object):
         # recreate empty folder
         self.getDefaultSaveDirectory()
 
+
 class _CSMLoggerManager:
-    ''' manages the active instance (and older instances) of CSMLogger '''
+    """manages the active instance (and older instances) of CSMLogger"""
 
     def __init__(self):
         # loggers that are no longer default (setup() was called again, though may still be in use)
@@ -194,7 +221,7 @@ class _CSMLoggerManager:
 
         # publish methods from this guy
         for name in dir(self):
-            if name.startswith('_') or name.endswith('_'):
+            if name.startswith("_") or name.endswith("_"):
                 continue
 
             globals()[name] = getattr(self, name)
@@ -206,7 +233,7 @@ class _CSMLoggerManager:
         return self._activeCsmLogger.getLogger(*args, **kwargs)
 
     def close(self):
-        ''' will close ALL known CSMLoggers, including active and old '''
+        """will close ALL known CSMLoggers, including active and old"""
         if not self._activeCsmLogger:
             raise RuntimeError("(csmlog) setup() must be called first!")
 
@@ -241,15 +268,31 @@ class _CSMLoggerManager:
         for logger in self._oldCsmLoggers:
             logger.setFormatter(formatter)
 
-    def setup(self, appName, clearLogs=False, udpLogging=True, googleSheetShareEmail=None):
-        ''' must be called to setup the logger. Passes args to CSMLogger's constructor '''
+    def setup(
+        self,
+        appName,
+        clearLogs=False,
+        udpLogging=True,
+        googleSheetShareEmail=None,
+        modifyChildLoggersFunc=None,
+    ):
+        """must be called to setup the logger. Passes args to CSMLogger's constructor"""
 
         if self._activeCsmLogger is not None:
-            self._activeCsmLogger.parentLogger.debug("CSMLogger was already setup. Swapping to appName: %s." % appName)
+            self._activeCsmLogger.parentLogger.debug(
+                "CSMLogger was already setup. Swapping to appName: %s." % appName
+            )
             self._oldCsmLoggers.append(self._activeCsmLogger)
 
-        self._activeCsmLogger = CSMLogger(appName, clearLogs, udpLogging, googleSheetShareEmail)
+        self._activeCsmLogger = CSMLogger(
+            appName,
+            clearLogs,
+            udpLogging,
+            googleSheetShareEmail,
+            modifyChildLoggersFunc,
+        )
         self._activeCsmLogger.parentLogger.debug("==== %s is starting ====" % appName)
+
 
 # this will also publish all public methods to globals() for this file.
 _csmLoggerManager = _CSMLoggerManager()

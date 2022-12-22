@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create GitHub release
-        uses: Roang-zero1/github-create-release-action@master
+        uses: Roang-zero1/github-create-release-action@v3
         with:
           version_regex: ^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+
         env:
@@ -54,7 +54,7 @@ jobs:
       - name: Build and publish
         working-directory: ${{ github.workspace }}
         env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           python setup.py sdist bdist_wheel

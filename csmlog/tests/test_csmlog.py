@@ -12,68 +12,73 @@ import pytest
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from conftest import APPNAME, CSMLogger, UdpHandlerReceiver, LoggedSystemCall
 
+
 def test_get_logger_and_clear_logs(csmlog):
 
-    tmp = csmlog.getLogger('tmp')
+    tmp = csmlog.getLogger("tmp")
     for i in range(100):
-        tmp.debug('hey debug')
-        tmp.info('hey info')
+        tmp.debug("hey debug")
+        tmp.info("hey info")
 
-    loggerFile = os.path.join(csmlog.getDefaultSaveDirectory(), APPNAME + '.' + 'tmp.txt')
+    loggerFile = os.path.join(
+        csmlog.getDefaultSaveDirectory(), APPNAME + "." + "tmp.txt"
+    )
     assert os.path.isfile(loggerFile)
-    with open(loggerFile, 'r') as f:
+    with open(loggerFile, "r") as f:
         txt = f.read()
 
-    assert 'hey debug' in txt
-    assert 'hey info' in txt
+    assert "hey debug" in txt
+    assert "hey info" in txt
 
     # parent should have text also
-    parentFile = os.path.join(csmlog.getDefaultSaveDirectory(), APPNAME + '.txt')
+    parentFile = os.path.join(csmlog.getDefaultSaveDirectory(), APPNAME + ".txt")
     assert os.path.isfile(parentFile)
 
-    with open(parentFile, 'r') as f:
+    with open(parentFile, "r") as f:
         txt = f.read()
 
-    assert 'hey debug' in txt
-    assert 'hey info' in txt
+    assert "hey debug" in txt
+    assert "hey info" in txt
 
     csmlog.close()
     csmlog.clearLogs()
 
     assert not os.path.isfile(loggerFile)
 
+
 def test_multi_setup_passes_and_moves(csmlog):
-    ''' the final call to setup() is the one that prevails. '''
+    """the final call to setup() is the one that prevails."""
 
     first_save_directory_path = csmlog.getDefaultSaveDirectory()
-    logger = csmlog.getLogger('test1')
+    logger = csmlog.getLogger("test1")
     logger.debug("hello1")
 
-    assert 'hello1' in pathlib.Path(logger.logFile).read_text()
-    CSMLogger.setup('test2')
+    assert "hello1" in pathlib.Path(logger.logFile).read_text()
+    CSMLogger.setup("test2")
 
     # SAME LOGGER AS ABOVE... SHOULD STILL POINT TO ORIGINAL SPOT
-    logger.debug('hello2')
-    assert 'hello1' in pathlib.Path(logger.logFile).read_text()
-    assert 'hello2' in pathlib.Path(logger.logFile).read_text()
+    logger.debug("hello2")
+    assert "hello1" in pathlib.Path(logger.logFile).read_text()
+    assert "hello2" in pathlib.Path(logger.logFile).read_text()
 
     # this is a brand new logger. It should ONLY go to the new location
-    logger2 = csmlog.getLogger('test2')
-    logger2.debug('hello3')
-    assert 'hello1' not in pathlib.Path(logger2.logFile).read_text()
-    assert 'hello2' not in pathlib.Path(logger2.logFile).read_text()
-    assert 'hello3' in pathlib.Path(logger2.logFile).read_text()
+    logger2 = csmlog.getLogger("test2")
+    logger2.debug("hello3")
+    assert "hello1" not in pathlib.Path(logger2.logFile).read_text()
+    assert "hello2" not in pathlib.Path(logger2.logFile).read_text()
+    assert "hello3" in pathlib.Path(logger2.logFile).read_text()
 
-    logger.debug('hello4')
-    assert 'hello1' in pathlib.Path(logger.logFile).read_text()
-    assert 'hello2' in pathlib.Path(logger.logFile).read_text()
-    assert 'hello3' not in pathlib.Path(logger.logFile).read_text()
-    assert 'hello4' in pathlib.Path(logger.logFile).read_text()
+    logger.debug("hello4")
+    assert "hello1" in pathlib.Path(logger.logFile).read_text()
+    assert "hello2" in pathlib.Path(logger.logFile).read_text()
+    assert "hello3" not in pathlib.Path(logger.logFile).read_text()
+    assert "hello4" in pathlib.Path(logger.logFile).read_text()
 
-    assert 'hello1' not in pathlib.Path(logger2.logFile).read_text()
-    assert 'hello2' not in pathlib.Path(logger2.logFile).read_text()
-    assert 'hello3' in pathlib.Path(logger2.logFile).read_text()
-    assert 'hello4' not in pathlib.Path(logger2.logFile).read_text()
+    assert "hello1" not in pathlib.Path(logger2.logFile).read_text()
+    assert "hello2" not in pathlib.Path(logger2.logFile).read_text()
+    assert "hello3" in pathlib.Path(logger2.logFile).read_text()
+    assert "hello4" not in pathlib.Path(logger2.logFile).read_text()
+
 
 def test_sending_to_stderr(csmlog):
     sys.stderr = io.StringIO()
@@ -90,7 +95,8 @@ def test_sending_to_stderr(csmlog):
         sys.stderr = sys.__stderr__
 
     assert "test" in output
-    assert 'failure' not in output
+    assert "failure" not in output
+
 
 def test_sending_to_alt_stream(csmlog):
     sys.stdout = io.StringIO()
@@ -107,7 +113,8 @@ def test_sending_to_alt_stream(csmlog):
         sys.stdout = sys.__stdout__
 
     assert "test" in output
-    assert 'failure' not in output
+    assert "failure" not in output
+
 
 def test_2_enables_disables_first(csmlog):
     sys.stderr = io.StringIO()
@@ -130,10 +137,11 @@ def test_2_enables_disables_first(csmlog):
         sys.stdout = sys.__stdout__
 
     assert "test" not in stderrOut
-    assert 'failure' not in stderrOut
+    assert "failure" not in stderrOut
 
     assert "test" in stdoutOut
-    assert 'failure' not in stdoutOut
+    assert "failure" not in stdoutOut
+
 
 def test_udp_logging(csmlog):
     # create reciever
@@ -149,40 +157,45 @@ def test_udp_logging(csmlog):
             break
 
         # technically it may take a moment to appear in the buffer
-        time.sleep(.1)
+        time.sleep(0.1)
     else:
         assert udpRecv.getBuffer().count("bleh") == 1000
 
     udpRecv.requestStop()
     thread.join()
 
+
 def test_file_attribute(csmlog):
     logger = csmlog.getLogger(__file__)
-    logger.debug('hi')
+    logger.debug("hi")
+
 
 def test_logged_system_call(csmlog):
-    tmp = csmlog.getLogger('tmp')
+    tmp = csmlog.getLogger("tmp")
 
     sysCall = LoggedSystemCall(tmp)
     assert sysCall.call("echo hi", shell=True) == 0
-    assert 'hi' in sysCall.check_output('echo hi', shell=True)
+    assert "hi" in sysCall.check_output("echo hi", shell=True)
 
     assert sysCall.call("easdsadcho hi", shell=True) != 0
 
     with pytest.raises(subprocess.CalledProcessError):
-        sysCall.check_output('easdsadcho hi', shell=True)
+        sysCall.check_output("easdsadcho hi", shell=True)
 
-    loggerFile = os.path.join(csmlog.getDefaultSaveDirectory(), APPNAME + '.' + 'tmp.txt')
+    loggerFile = os.path.join(
+        csmlog.getDefaultSaveDirectory(), APPNAME + "." + "tmp.txt"
+    )
     assert os.path.isfile(loggerFile)
-    with open(loggerFile, 'r') as f:
+    with open(loggerFile, "r") as f:
         txt = f.read()
 
-    assert 'hi' in txt
-    assert 'easdsadcho' in txt
+    assert "hi" in txt
+    assert "easdsadcho" in txt
+
 
 def test_added_attrs_on_logger(csmlog):
-    ''' we add in the logFolder/logFile to the python logger. Make sure they are there '''
-    tmp = csmlog.getLogger('tmp2')
+    """we add in the logFolder/logFile to the python logger. Make sure they are there"""
+    tmp = csmlog.getLogger("tmp2")
     assert pathlib.Path(tmp.logFolder).is_dir()
 
     # file shouldn't exist till a log statement happens
@@ -192,22 +205,35 @@ def test_added_attrs_on_logger(csmlog):
 
 
 def test_formatter_setting(csmlog):
-    logger = csmlog.getLogger('log')
+    logger = csmlog.getLogger("log")
     logger.debug("helloworld")
-    assert 'DEBUG' in pathlib.Path(logger.logFile).read_text()
+    assert "DEBUG" in pathlib.Path(logger.logFile).read_text()
 
-    csmlog.setFormatter('%(created)f')
+    csmlog.setFormatter("%(created)f")
     logger.debug("helloworld")
-    assert 'helloworld' not in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
+    assert "helloworld" not in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
 
-    csmlog.setFormatter(logging.Formatter('%(created)f'))
+    csmlog.setFormatter(logging.Formatter("%(created)f"))
     logger.debug("helloworld")
-    assert 'helloworld' not in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
+    assert "helloworld" not in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
 
-    logger2 = csmlog.getLogger('log2')
+    logger2 = csmlog.getLogger("log2")
     logger2.debug("helloworld")
-    assert 'helloworld' not in pathlib.Path(logger2.logFile).read_text().splitlines()[-1]
+    assert (
+        "helloworld" not in pathlib.Path(logger2.logFile).read_text().splitlines()[-1]
+    )
 
     csmlog.setFormatter()
     logger.debug("helloworld")
-    assert 'helloworld' in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
+    assert "helloworld" in pathlib.Path(logger.logFile).read_text().splitlines()[-1]
+
+
+def test_modify_child_loggers_func(csmlog):
+    def _tmp(logger):
+        logger.lolcats = "lolcats"
+        return logger
+
+    csmlog.modifyChildLoggersFunc = _tmp
+
+    assert csmlog.getLogger("tmp").lolcats == "lolcats"
+    assert not hasattr(csmlog.parentLogger, "lolcats")
