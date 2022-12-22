@@ -16,7 +16,7 @@ from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = "0.26.0"
+__version__ = "0.27.0"
 
 DEFAULT_LOG_FORMAT = "%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s"
 
@@ -74,7 +74,7 @@ class CSMLogger(object):
         logger.sysCall = LoggedSystemCall(logger)
 
         if self.modifyChildLoggersFunc:
-            logger = self.modifyChildLoggersFunc(logger)
+            self.modifyChildLoggersFunc(logger)
 
         return logger
 
@@ -274,6 +274,7 @@ class _CSMLoggerManager:
         clearLogs=False,
         udpLogging=True,
         googleSheetShareEmail=None,
+        formatter=None,
         modifyChildLoggersFunc=None,
     ):
         """must be called to setup the logger. Passes args to CSMLogger's constructor"""
@@ -289,7 +290,8 @@ class _CSMLoggerManager:
             clearLogs,
             udpLogging,
             googleSheetShareEmail,
-            modifyChildLoggersFunc,
+            formatter=formatter,
+            modifyChildLoggersFunc=modifyChildLoggersFunc,
         )
         self._activeCsmLogger.parentLogger.debug("==== %s is starting ====" % appName)
 

@@ -29,8 +29,7 @@ Note that logs may be delayed due to rate limiting, etc. If you are logging *a l
 
 
 ## Customized Child Loggers
-`setup()` has an optional parameter: `modifyChildLoggersFunc`. If it is given, it must be a function that would take in each created child logger
-and return a child logger. This can be used to add additional things like handlers to each child logger.
+`setup()` has an optional parameter: `modifyChildLoggersFunc`. If it is given, it must be a function that would take in as a single arg, each created child logger. This can be used to add additional things like handlers to each child logger. (Note that the child logger is modified in place).
 
 ## Installation
 ```

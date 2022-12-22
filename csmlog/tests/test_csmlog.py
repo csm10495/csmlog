@@ -231,7 +231,6 @@ def test_formatter_setting(csmlog):
 def test_modify_child_loggers_func(csmlog):
     def _tmp(logger):
         logger.lolcats = "lolcats"
-        return logger
 
     csmlog.modifyChildLoggersFunc = _tmp
 
