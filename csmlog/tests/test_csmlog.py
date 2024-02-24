@@ -10,7 +10,13 @@ import pathlib
 import pytest
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from conftest import APPNAME, CSMLogger, UdpHandlerReceiver, LoggedSystemCall, CSMLOG_DEFAULT_SAVE_DIRECTORY
+from conftest import (
+    APPNAME,
+    CSMLogger,
+    UdpHandlerReceiver,
+    LoggedSystemCall,
+    CSMLOG_DEFAULT_SAVE_DIRECTORY,
+)
 
 
 def test_get_logger_and_clear_logs(csmlog):
@@ -240,9 +246,9 @@ def test_modify_child_loggers_func(csmlog):
 
 def test_get_default_save_directory_with_name_override(monkeypatch, tmp_path):
     monkeypatch.setenv("CSMLOG_DEFAULT_SAVE_DIRECTORY", str(tmp_path))
-    test123 = tmp_path / 'test123'
-    assert CSMLogger.getDefaultSaveDirectoryWithName('test123') == str(test123)
+    test123 = tmp_path / "test123"
+    assert CSMLogger.getDefaultSaveDirectoryWithName("test123") == str(test123)
     assert test123.is_dir()
 
     # calling a second time doesn't cause an issue.
-    assert CSMLogger.getDefaultSaveDirectoryWithName('test123') == str(test123)
+    assert CSMLogger.getDefaultSaveDirectoryWithName("test123") == str(test123)
