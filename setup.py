@@ -31,6 +31,7 @@ setup(
         "Programming Language :: Python :: 3",
     ],
     include_package_data=True,
-    install_requires=["six", "gspread"],
+    # gspread<6 to keep py 3.7 support.
+    install_requires=["six", "gspread<6.0.0"],
     entry_points={"console_scripts": ["csmlogudp = csmlog.udp_handler_receiver:main"]},
 )
