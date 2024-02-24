@@ -14,6 +14,7 @@ from csmlog import (
     UdpHandlerReceiver,
     LoggedSystemCall,
     setup,
+    CSMLOG_DEFAULT_SAVE_DIRECTORY
 )
 
 APPNAME = "csmlog_test"

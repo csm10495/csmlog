@@ -16,9 +16,10 @@ from csmlog.system_call import LoggedSystemCall
 from csmlog.udp_handler import UdpHandler
 from csmlog.udp_handler_receiver import UdpHandlerReceiver
 
-__version__ = "0.27.0"
+__version__ = "0.28.0"
 
 DEFAULT_LOG_FORMAT = "%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s"
+CSMLOG_DEFAULT_SAVE_DIRECTORY = "CSMLOG_DEFAULT_SAVE_DIRECTORY"
 
 
 class CSMLogger(object):
@@ -182,20 +183,24 @@ class CSMLogger(object):
 
     @classmethod
     def getDefaultSaveDirectoryWithName(cls, appName):
-        if os.name == "nt":
-            logFolder = os.path.join(os.path.expandvars("%APPDATA%"), appName)
+        override = os.environ.get(CSMLOG_DEFAULT_SAVE_DIRECTORY, None)
+        if override:
+            logFolder = os.path.join(override, appName)
         else:
-            tmpPath = Path(f"/var/log/{uuid.uuid4()}")
-            try:
-                tmpPath.touch()
-                tmpPath.unlink()
-                tmpPath = tmpPath.parent
-            except PermissionError:
-                # can't use /var/log... try using ~/log/
-                tmpPath = Path.home() / "log"
-                tmpPath.mkdir(exist_ok=True)
+            if os.name == "nt":
+                logFolder = os.path.join(os.path.expandvars("%APPDATA%"), appName)
+            else:
+                tmpPath = Path(f"/var/log/{uuid.uuid4()}")
+                try:
+                    tmpPath.touch()
+                    tmpPath.unlink()
+                    tmpPath = tmpPath.parent
+                except PermissionError:
+                    # can't use /var/log... try using ~/log/
+                    tmpPath = Path.home() / "log"
+                    tmpPath.mkdir(exist_ok=True)
 
-            logFolder = tmpPath / appName
+                logFolder = tmpPath / appName
 
         if not os.path.isdir(logFolder):
             os.makedirs(logFolder)
